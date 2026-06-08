@@ -109,7 +109,7 @@ if "messages" not in st.session_state:
         "role": "assistant",
         "content": (
             "🌱 Bonjour ! Je suis **EcoBot**, l'assistant IA de la plateforme Éco-Nancy.\n\n"
-            "Notre flotte de **30 vélos-cargos électriques** couvre le centre-ville et la ZFE.\n\n"
+            "Notre flotte de **vélos-cargos électriques** couvre le centre-ville et la ZFE.\n\n"
             "Je peux vous aider à :\n"
             "- 📦 Suivre votre colis en temps réel\n"
             "- 🕒 Modifier un créneau de livraison\n"
@@ -122,9 +122,10 @@ if "messages" not in st.session_state:
 if "co2_saved"         not in st.session_state: st.session_state.co2_saved         = 54.2
 if "success_rate"      not in st.session_state: st.session_state.success_rate      = 94.1
 if "livraisons_jour"   not in st.session_state: st.session_state.livraisons_jour   = 127
+if "congestion_active" not in st.session_state: st.session_state.congestion_active = False
 
 # ==========================================
-# 4. SIDEBAR
+# 4. SIDEBAR (Avec Curseurs et État Persistant)
 # ==========================================
 with st.sidebar:
     st.image(
@@ -134,21 +135,39 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("### ⚙️ Pilotage de Flotte")
 
-    if st.button("🚨 Alerte Congestion Stanislas", use_container_width=True):
-        st.warning("⚡ IA a réaffecté les unités — itinéraire alternatif via les micro-hubs (Carnot).")
+    # --- AJOUT DES SLIDERS DYNAMIQUES ---
+    flotte_totale = st.slider("🚲 Taille de la flotte totale", min_value=10, max_value=50, value=30, step=1)
+    
+    # Sécurité pour éviter que la flotte active dépasse la flotte totale
+    max_active = flotte_totale
+    flotte_active_init = min(30, max_active)
+    flotte_active = st.slider("🟢 Vélos-cargos actifs en ville", min_value=0, max_value=max_active, value=flotte_active_init, step=1)
+
+    st.markdown("---")
+    st.markdown("### 🚨 Simulations Temps Réel")
+
+    # Bouton Congestion lié au session_state pour rester activé
+    if st.button("Basculer Alerte Stanislas", use_container_width=True):
+        st.session_state.congestion_active = not st.session_state.congestion_active
+
+    if st.session_state.congestion_active:
+        st.warning("⚠️ Alerte Congestion Stanislas active !\n\n⚡ IA centrale : 8 unités déviées par Rue Callot ➔ Place Carnot.")
+        # Ajustement dynamique basé sur l'alerte
+        vélos_affichés = max(0, flotte_active - 8)
+        st.caption(f"🚲 {vélos_affichés} unités sur les axes standards, 8 en déviation.")
+    else:
+        st.info("Secteur Stanislas fluide. Aucun itinéraire alternatif requis.")
 
     if st.button("♻️ Recalculer l'impact Carbone", use_container_width=True):
         st.session_state.co2_saved += 4.5
-        st.success(f"✅ Données consolidées : **{st.session_state.co2_saved:.1f} kg** de CO₂ économisés.")
+        st.success(f"✅ Données calculées : **{st.session_state.co2_saved:.1f} kg** économisés.")
 
     st.markdown("---")
-    flotte_active = 30
-    st.markdown(f"### 🚲 Flotte : {flotte_active}/30 actifs")
-    st.progress(flotte_active / 30)
+    st.markdown(f"**Statut :** {flotte_active} / {flotte_totale} opérationnels")
+    st.progress(flotte_active / flotte_totale)
 
     st.markdown("---")
     st.markdown("### 👤 Développé par :")
-
     photo_path = "photo_wassim.jpg"
     if os.path.exists(photo_path):
         try:
@@ -167,14 +186,14 @@ st.markdown("""
 <div class="main-header">
   <h1 style="margin:0;font-size:26px;">🌱 Plateforme de Livraison Décarbonée — Grand Nancy</h1>
   <p style="margin:8px 0 0 0;opacity:.9;font-size:14px;">
-    Analyse Consolidée : Flotte de <strong>30 vélos-cargos</strong> pilotée par IA Générative.
+    Analyse Consolidée : Flotte dynamique pilotée par IA Générative.
   </p>
 </div>
 """, unsafe_allow_html=True)
 
-# KPIs rapides
+# Les KPIs s'adaptent désormais aux Sliders en temps réel !
 c1, c2, c3, c4 = st.columns(4)
-c1.metric("🚲 Flotte opérationnelle", "30 / 30", "100 % actif")
+c1.metric("🚲 Flotte opérationnelle", f"{flotte_active} / {flotte_totale}", f"{int((flotte_active/flotte_totale)*100)}% active")
 c2.metric("✅ Succès 1er passage",     f"{st.session_state.success_rate:.1f} %", "Objectif : 95%")
 c3.metric("🌿 CO₂ économisé/jour",    f"{st.session_state.co2_saved:.1f} kg",   "vs diesel")
 c4.metric("📦 Livraisons aujourd'hui", str(st.session_state.livraisons_jour),    "+12 vs hier")
@@ -193,7 +212,7 @@ tab1, tab2, tab3, tab4, tab5 = st.tabs([
 ])
 
 # ─────────────────────────────────────────
-# ONGLET 1 — CHATBOT ENRICHI (Sans API)
+# ONGLET 1 — CHATBOT ENRICHI
 # ─────────────────────────────────────────
 with tab1:
     st.markdown('<div class="section-title">💬 EcoBot — Assistant Livraison Décarbonée</div>', unsafe_allow_html=True)
@@ -201,9 +220,9 @@ with tab1:
     col_chat, col_aide = st.columns([2, 1])
 
     with col_aide:
-        st.markdown("""
+        st.markdown(f"""
         <div style="background:#E8F5E9;border-radius:10px;padding:15px;">
-        <b>💡 Exemples de requêtes traitées par l'IA centrale :</b><br><br>
+        <b>💡 Exemples de requêtes :</b><br><br>
         🔍 <i>"Où est mon colis ?"</i><br>
         🕒 <i>"Je suis absent à 18h"</i><br>
         🏠 <i>"Déposez chez le voisin"</i><br>
@@ -222,45 +241,41 @@ with tab1:
             st.session_state.messages.append({"role": "user", "content": prompt})
             ui = prompt.lower()
 
-            # Moteur de réponses contextuelles (IA simulée par mots-clés)
             if any(w in ui for w in ["suivi", "où", "colis", "livraison"]):
                 response = (
                     "📍 **Suivi de livraison optimisé :**\n\n"
-                    f"Grâce à notre flotte consolidée de 30 vélos, l'unité **#{np.random.randint(1,31):02d}** est à "
-                    f"moins de 500m de la Place Stanislas.\n\n"
-                    "⏱️ **Arrivée imminente :** Je vous confirme mon passage 15 minutes avant l'arrivée."
+                    f"Grâce à notre maillage de {flotte_active} vélos actifs, l'unité **#{np.random.randint(1, flotte_active+1):02d}** est à "
+                    f"moins de 500m du centre-ville.\n\n"
+                    "⏱️ **Arrivée imminente :** Un SMS automatique vous sera envoyé 15 minutes avant le passage."
                 )
 
             elif any(w in ui for w in ["absent", "18h", "19h", "soir", "tard"]):
                 response = (
                     "🕒 **Modification d'itinéraire :**\n\n"
-                    "L'IA centrale a mis à jour la tournée en temps réel. Le volume de notre flotte nous "
-                    "permet d'offrir cette flexibilité horaire **sans aucun surcoût carbone**."
+                    "L'IA centrale a réorganisé la tournée de livraison en direct. Notre capacité de traitement "
+                    "nous permet cette flexibilité horaire sans générer d'émissions de carbone supplémentaires."
                 )
                 st.session_state.success_rate = min(98.0, st.session_state.success_rate + 0.1)
 
             elif any(w in ui for w in ["voisin", "consigne", "relais", "hub"]):
                 response = (
                     "✅ **Consigne validée :**\n\n"
-                    "Instruction transmise. Cela nous aide grandement à maintenir notre objectif de "
-                    "**95% de succès de livraison** dès le premier passage. "
-                    "Vos colis consolidés au dernier moment réduisent l'impact."
+                    "La consigne de dépôt secondaire est enregistrée. Cela nous aide à maintenir notre objectif de "
+                    "**95% de succès au premier passage**."
                 )
                 st.session_state.co2_saved += 1.5
 
             elif any(w in ui for w in ["co2", "carbone", "écolo", "impact"]):
                 response = (
-                    "🌍 **Impact de notre solution :**\n\n"
-                    "Comparé à un système dépendant des énergies fossiles, un vélo cargo affiche "
-                    "**zéro émission directe**. Nous surveillons aussi l'usure de nos batteries en temps réel "
-                    "pour garantir la durabilité de la flotte."
+                    f"🌍 **Bilan de la flotte :**\n\n"
+                    f"Avec nos vélos-cargos, nous avons déjà sécurisé l'équivalent de **{st.session_state.co2_saved:.1f} kg** "
+                    f"de CO₂ évités aujourd'hui sur Nancy."
                 )
 
             else:
                 response = (
-                    "✅ **Instruction reçue :**\n\n"
-                    "L'information a été transmise au cerveau central de notre IA qui consolide les "
-                    "tournées de nos 30 vélos en ville."
+                    f"✅ **Instruction reçue :**\n\n"
+                    f"Prise en compte par le système central logistique gérant nos {flotte_active} unités en mouvement."
                 )
 
             time.sleep(0.4)
@@ -268,22 +283,22 @@ with tab1:
             st.rerun()
 
 # ─────────────────────────────────────────
-# ONGLET 2 — CARTE
+# ONGLET 2 — CARTE DYNAMIQUE
 # ─────────────────────────────────────────
 with tab2:
-    st.markdown('<div class="section-title">🗺️ Localisation Temps Réel — 30 Vélos-Cargos</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="section-title">🗺️ Localisation Temps Réel — {flotte_active} Vélos-Cargos</div>', unsafe_allow_html=True)
     
     np.random.seed(42)
-    # Simulation des 30 unités dans la ZFE de Nancy
+    # Génère exactement le nombre de points sélectionnés sur le slider
     df_map = pd.DataFrame(
-        np.random.randn(30, 2) / [180, 180] + [48.6920, 6.1844],
+        np.random.randn(flotte_active, 2) / [180, 180] + [48.6920, 6.1844],
         columns=['lat', 'lon']
     )
     st.map(df_map, zoom=14, color="#2E7D32")
-    st.caption("Visualisation du maillage territorial : 30 unités couvrant les zones ZFE du Grand Nancy.")
+    st.caption(f"Visualisation dynamique du réseau : {flotte_active} positions GPS actives sur la ZFE de Nancy.")
 
 # ─────────────────────────────────────────
-# ONGLET 3 — DASHBOARD (D'IMPACT)
+# ONGLET 3 — DASHBOARD
 # ─────────────────────────────────────────
 with tab3:
     st.markdown('<div class="section-title">📊 Analyse d\'Impact — Performance Écologique</div>', unsafe_allow_html=True)
@@ -291,29 +306,27 @@ with tab3:
     col_a, col_b = st.columns(2)
 
     with col_a:
-        # Graphique des émissions (chute avec 30 vélos)
         semaines = ["S-4", "S-3", "S-2", "S-1", "S-En cours"]
         fig_em = go.Figure()
         fig_em.add_trace(go.Scatter(
             x=semaines, y=[100, 105, 110, 115, 120],
-            mode="lines+markers", name="🚛 Camionnettes (Système dominant)",
+            mode="lines+markers", name="Customer System (Camionnettes)",
             line=dict(color="#E53935", width=3)
         ))
         fig_em.add_trace(go.Scatter(
             x=semaines, y=[100, 70, 40, 20, 15],
-            mode="lines+markers", name="🚲 Flotte 30 vélos-cargos",
+            mode="lines+markers", name="Flotte de Vélos-Cargos",
             line=dict(color="#43A047", width=3),
             fill="tozeroy", fillcolor="rgba(67,160,71,0.1)"
         ))
         fig_em.update_layout(
-            title="📉 Réduction des émissions de CO₂",
+            title="📉 Chute des Émissions de CO₂ (Base 100)",
             plot_bgcolor="white", height=320,
             legend=dict(orientation="h", y=-0.2)
         )
         st.plotly_chart(fig_em, use_container_width=True)
 
     with col_b:
-        # Taux de succès
         fig_gauge = go.Figure(go.Indicator(
             mode="gauge+number+delta",
             value=st.session_state.success_rate,
@@ -335,7 +348,7 @@ with tab3:
         st.plotly_chart(fig_gauge, use_container_width=True)
 
 # ─────────────────────────────────────────
-# ONGLET 4 — TMC INTERACTIF (Données Réelles du Projet)
+# ONGLET 4 — TMC INTERACTIF
 # ─────────────────────────────────────────
 with tab4:
     st.markdown('<div class="section-title">🔄 Transition Model Canvas — Analyse Stratégique</div>', unsafe_allow_html=True)
@@ -359,17 +372,11 @@ with tab4:
             <h3 style="color:#C62828;">⚠️ SYSTÈME DOMINANT (Incumbent)</h3>
             <p><b>🔑 Acteurs Clés :</b> Leaders mondiaux (DHL, UPS, La Poste) et géants de l'e-commerce (Amazon).</p>
             <p><b>🔗 Interactions rigides :</b> Contrats B2B massifs, horaires imposés (8h-18h), hubs logistiques lointains (Essey, Seichamps).</p>
-            <p><b>💪 Forces :</b> Économies d'échelle, puissance de lobbying, habitudes ancrées des consommateurs.</p>
-            <p><b>🔴 Vulnérabilités :</b></p>
-            <ul>
-                <li>Dépendance aux énergies fossiles.</li>
-                <li>Congestion urbaine et amendes de stationnement.</li>
-                <li>Pression réglementaire (ZFE).</li>
-                <li>Coûts fluctuants du carburant (ex: géopolitique, crise Iran/Israël).</li>
-            </ul>
+            <p><b>💪 Forces :</b> Économies d'échelle, puissance de lobbying, habitudes de livraison express.</p>
+            <p><b>🔴 Vulnérabilités :</b> Dépendance aux énergies fossiles, congestion urbaine massive, amendes, et coûts du carburant indexés sur les crises mondiales (ex: Iran/Israël).</p>
             <hr>
             <h5 style="color:#C62828;">🛡️ Défense du système :</h5>
-            <p>Lobbying pour retarder les ZFE, greenwashing (mise en avant de nouveaux moteurs diesel), baisse des prix pour étouffer les startups innovantes.</p>
+            <p>Lobbying pro-diesel, dumping tarifaire temporaire pour étouffer l'innovation, rachat de brevets logistiques.</p>
         </div>
         """, unsafe_allow_html=True)
 
@@ -377,18 +384,13 @@ with tab4:
         st.markdown("""
         <div class="tmc-card tmc-niche">
             <h3 style="color:#1B5E20;">🌱 SYSTÈME DE NICHE</h3>
-            <p><b>🔑 Éléments Clés :</b> L'IA agit comme un "cerveau central" connectant les commandes et le transport pour consolider les livraisons.</p>
-            <p><b>🤝 Interactions :</b> Communication bidirectionnelle (chatbot) pour valider la présence 15 min avant le passage. Maintenance anticipée des batteries.</p>
-            <p><b>💚 Forces :</b></p>
-            <ul>
-                <li>Agilité en centre-ville et Zéro émission.</li>
-                <li>Réduction drastique de l'énergie.</li>
-                <li>Création d'emplois qualifiés (ingénieurs, dev IA).</li>
-            </ul>
-            <p><b>⚠️ Vulnérabilités :</b> Capacité de charge limitée, dépendance à la météo, technologie récente, filières de recyclage des batteries.</p>
+            <p><b>🔑 Éléments Clés :</b> L'IA agit comme un "cerveau central" analytique reliant commandes et transport de manière optimisée.</p>
+            <p><b>🤝 Interactions :</b> Dialogue client via chatbot conversationnel 15 min avant le passage pour sécuriser le taux de succès.</p>
+            <p><b>💚 Forces :</b> Agilité complète, zéro émission directe, préservation de la qualité de vie en ville, création d'emplois tech locaux.</p>
+            <p><b>⚠️ Vulnérabilités :</b> Poids et volume par colis limités, exposition météo, logistique de rechargement/recyclage des batteries.</p>
             <hr>
             <h5 style="color:#1B5E20;">🚀 Stratégie de déstabilisation :</h5>
-            <p>Campagnes sur le vrai "coût carbone", partenariats avec les municipalités pour microhubs, mutualisation des plateformes d'IA.</p>
+            <p>Campagnes sur le coût carbone réel par colis, alliances stratégiques d'externalisation, mutualisation d'outils d'IA.</p>
         </div>
         """, unsafe_allow_html=True)
 
@@ -399,9 +401,9 @@ with tab5:
     st.markdown('<div class="section-title">🧪 Faisabilité & Documentation des Prompts IA</div>', unsafe_allow_html=True)
 
     st.markdown("### ✅ Éléments de Faisabilité et de Contexte Global")
-    st.write("Le **Paysage (Landscape)** est favorable à cette transition grâce aux facteurs suivants : accords de Paris, urbanisation croissante, explosion de l'e-commerce (+30% d'ici 2030), prise de conscience écologique des citoyens, crises énergétiques et hausses des taxes carbone mondiales.")
+    st.write("Le **Paysage (Landscape)** global pousse à la transition : accords de Paris, urbanisation accélérée, explosion structurelle de l'e-commerce (+30% d'ici 2030), sensibilité environnementale accrue de la population, et taxes carbone à la hausse.")
     
-    st.markdown("### 🤖 Prompts Utilisés (Modélisation de l'IA Générative)")
+    st.markdown("### 🤖 Prompts Utilisés pour concevoir la solution")
     
     prompts = [
         {
@@ -429,6 +431,6 @@ st.markdown("""
 <div class="footer">
   <strong>🌱 Projet Éco-Logistique Nancy</strong> — Hackathon ICN Business School<br>
   Développé par <strong>Wassim Abdelli</strong> &nbsp;·&nbsp; PGE 2 Transformation Numérique &amp; Écologique<br>
-  <small>Prototype Phase 2 &nbsp;·&nbsp; Données consolidées pour 30 unités de livraison</small>
+  <small>Prototype Phase 2 &nbsp;·&nbsp; Données modulables en temps réel pour soutenance</small>
 </div>
 """, unsafe_allow_html=True)
